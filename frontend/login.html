@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JobMailer · Sign in</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='13' fill='%235b5bf7'/%3E%3Cpath d='M11 24.5 37 13l-6.5 23-7.2-7.6-5.3 4.1.7-7.3z' fill='%23fff'/%3E%3C/svg%3E">
+<script>try{const m=localStorage.getItem("jm_mode")||"auto";document.documentElement.dataset.mode=m==="dark"||(m==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";document.documentElement.dataset.accent=localStorage.getItem("jm_accent")||"indigo"}catch{}</script>
+<link rel="stylesheet" href="theme.css">
+<style>
+  body { display: grid; grid-template-columns: 1.1fr 1fr; min-height: 100vh; }
+  @media (max-width: 860px) { body { grid-template-columns: 1fr; } .hero { padding: 28px 16px 0 !important; } .hero .features { display: none; } }
+
+  .topbar { position: fixed; top: 16px; right: 16px; z-index: 5; }
+  .hero { padding: 48px 56px; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
+  .hero h1 { font-size: clamp(28px, 4vw, 46px); line-height: 1.1; margin: 0; letter-spacing: -.03em; }
+  .hero h1 em { font-style: normal; background: linear-gradient(135deg, var(--a1), var(--a2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero p { color: var(--muted); font-size: 16px; margin: 0; max-width: 460px; }
+  .features { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .features li { display: flex; gap: 10px; align-items: center; background: var(--glass); backdrop-filter: blur(8px);
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; max-width: 420px; }
+  .features span { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--a-soft); flex: none; }
+
+  .side { display: grid; place-items: center; padding: 32px 16px; }
+  .card { width: 100%; max-width: 400px; background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line);
+    border-radius: 22px; padding: 26px 28px 28px; box-shadow: var(--shadow); }
+  .card.shake { animation: shake .45s; }
+  @keyframes shake { 20%,60% { transform: translateX(-8px); } 40%,80% { transform: translateX(8px); } }
+
+  /* Pip the mascot */
+  .mascot { display: block; width: 150px; height: 120px; margin: -70px auto 4px; overflow: visible; }
+  .mascot .bob { animation: bob 3.2s ease-in-out infinite; transform-origin: center; }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+  .mascot .lid { transform-origin: center; transform-box: fill-box; animation: blink 4.5s infinite; }
+  @keyframes blink { 0%, 94%, 100% { transform: scaleY(0); } 97% { transform: scaleY(1); } }
+  .mascot .hands { transition: transform .35s cubic-bezier(.5,1.6,.5,1), opacity .2s; transform: translateY(34px); opacity: 0; }
+  .mascot.shy .hands { transform: translateY(0); opacity: 1; }
+  .mascot .mouth { transition: d .3s; }
+  .mascot.fly { animation: fly 1s ease-in forwards; }
+  @keyframes fly { 30% { transform: translate(-10px, 8px) rotate(-8deg); } 100% { transform: translate(420px, -380px) rotate(-25deg) scale(.4); opacity: 0; } }
+  .bubble { text-align: center; font-weight: 600; min-height: 22px; margin-bottom: 10px; transition: opacity .2s; }
+
+  .tabs { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 4px; margin-bottom: 18px; }
+  .tabs button { flex: 1; justify-content: center; background: transparent; color: var(--muted); box-shadow: none; }
+  .tabs button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 5px rgba(0,0,0,.12); }
+  label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin: 12px 0 5px; }
+  .pw { position: relative; }
+  .pw button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; color: var(--muted);
+    box-shadow: none; padding: 4px 8px; font-size: 12px; }
+  .meter { height: 4px; border-radius: 4px; background: var(--line); margin-top: 6px; overflow: hidden; }
+  .meter div { height: 100%; width: 0; transition: width .3s, background .3s; }
+  .submit { width: 100%; justify-content: center; margin-top: 20px; padding: 12px; font-size: 15px; }
+  .err { color: var(--bad); font-size: 13px; min-height: 20px; margin-top: 10px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="topbar"><button class="ghost icon" data-theme-picker title="Theme & wallpaper" aria-label="Theme and wallpaper">🎨</button></div>
+
+<section class="hero above">
+  <div data-logo></div>
+  <h1>Apply to <em>40 companies</em> a day<br>without writing 40 emails.</h1>
+  <p>Add companies, let JobMailer find the HR inbox, and send each one an email written for that role — with your resume attached.</p>
+  <ul class="features">
+    <li><span>🔎</span> Finds HR and company emails, checked to be real</li>
+    <li><span>✍️</span> Writes each email from your resume and the job title</li>
+    <li><span>📅</span> Keeps a daily log and Excel sheet of every application</li>
+  </ul>
+</section>
+
+<section class="side above">
+  <form class="card" id="form" novalidate>
+    <svg class="mascot" id="pip" viewBox="0 0 150 120" aria-hidden="true">
+      <defs><linearGradient id="pipg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--a1)"/><stop offset="1" stop-color="var(--a2)"/></linearGradient></defs>
+      <ellipse cx="75" cy="114" rx="38" ry="5" fill="var(--ink)" opacity=".08"/>
+      <g class="bob">
+        <!-- wings -->
+        <path d="M22 60 2 48l10 22z" fill="url(#pipg)" opacity=".55"/><path d="M128 60l20-12-10 22z" fill="url(#pipg)" opacity=".55"/>
+        <!-- envelope body -->
+        <rect x="20" y="34" width="110" height="72" rx="14" fill="var(--surface)" stroke="url(#pipg)" stroke-width="4"/>
+        <path d="M24 40 75 76l51-36" fill="none" stroke="url(#pipg)" stroke-width="4" stroke-linejoin="round" opacity=".35"/>
+        <!-- eyes -->
+        <g id="eyes">
+          <circle cx="58" cy="66" r="10" fill="#fff" stroke="var(--line)"/><circle cx="92" cy="66" r="10" fill="#fff" stroke="var(--line)"/>
+          <circle class="pupil" cx="58" cy="66" r="4.5" fill="#1b1c2b"/><circle class="pupil" cx="92" cy="66" r="4.5" fill="#1b1c2b"/>
+          <rect class="lid" x="47" y="55" width="22" height="22" rx="11" fill="var(--surface)"/>
+          <rect class="lid" x="81" y="55" width="22" height="22" rx="11" fill="var(--surface)"/>
+        </g>
+        <circle cx="44" cy="82" r="5" fill="var(--a2)" opacity=".25"/><circle cx="106" cy="82" r="5" fill="var(--a2)" opacity=".25"/>
+        <path class="mouth" id="mouth" d="M68 86q7 6 14 0" fill="none" stroke="#1b1c2b" stroke-width="3" stroke-linecap="round"/>
+        <!-- hands that cover the eyes for passwords -->
+        <g class="hands"><circle cx="58" cy="68" r="13" fill="url(#pipg)"/><circle cx="92" cy="68" r="13" fill="url(#pipg)"/></g>
+        <!-- antenna stamp -->
+        <path d="M75 34V20" stroke="url(#pipg)" stroke-width="3"/><circle cx="75" cy="16" r="6" fill="url(#pipg)"/>
+      </g>
+    </svg>
+    <div class="bubble" id="bubble">Hi! I'm Pip 👋</div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" id="tLogin" role="tab">Sign in</button>
+      <button type="button" id="tSignup" role="tab">Create account</button>
+    </div>
+
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+    <label for="password">Password</label>
+    <div class="pw"><input id="password" type="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters">
+      <button type="button" id="peek">Show</button></div>
+    <div id="signupOnly" hidden>
+      <div class="meter"><div id="meter"></div></div>
+      <label for="confirm">Confirm password</label>
+      <input id="confirm" type="password" autocomplete="new-password">
+    </div>
+    <button class="submit" id="submit">Sign in</button>
+    <div class="err" id="err" role="alert"></div>
+  </form>
+</section>
+
+<script src="theme.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let mode = location.hash === "#signup" ? "signup" : "login";
+const say = t => { $("bubble").style.opacity = 0; setTimeout(() => { $("bubble").textContent = t; $("bubble").style.opacity = 1; }, 150); };
+const mood = m => $("mouth").setAttribute("d", { happy: "M68 86q7 6 14 0", oh: "M71 88a4 4 0 1 0 8 0a4 4 0 1 0-8 0", sad: "M68 90q7-6 14 0" }[m]);
+
+function render() {
+  const s = mode === "signup";
+  $("tLogin").classList.toggle("on", !s); $("tSignup").classList.toggle("on", s);
+  $("signupOnly").hidden = !s;
+  $("submit").textContent = s ? "Create my account" : "Sign in";
+  $("password").autocomplete = s ? "new-password" : "current-password";
+  document.title = `JobMailer · ${s ? "Create account" : "Sign in"}`;
+  say(s ? "Let's get you set up ✨" : "Welcome back! 👋");
+  $("err").textContent = "";
+}
+$("tLogin").onclick = () => { mode = "login"; history.replaceState(null, "", "#login"); render(); };
+$("tSignup").onclick = () => { mode = "signup"; history.replaceState(null, "", "#signup"); render(); };
+
+// eyes follow the cursor / the caret
+const pupils = [...document.querySelectorAll(".pupil")];
+function look(x, y) {
+  const r = $("pip").getBoundingClientRect();
+  pupils.forEach((p, i) => {
+    const cx = r.left + r.width * ((i ? 92 : 58) / 150), cy = r.top + r.height * (66 / 120);
+    const a = Math.atan2(y - cy, x - cx), d = Math.min(4.5, Math.hypot(x - cx, y - cy) / 40);
+    p.setAttribute("cx", (i ? 92 : 58) + Math.cos(a) * d); p.setAttribute("cy", 66 + Math.sin(a) * d);
+  });
+}
+addEventListener("pointermove", e => look(e.clientX, e.clientY));
+$("email").addEventListener("input", e => {
+  const r = e.target.getBoundingClientRect();
+  look(r.left + Math.min(r.width, 14 + e.target.value.length * 7.5), r.top + r.height / 2);
+  mood(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.target.value) ? "happy" : "oh");
+});
+
+// shy when typing a hidden password
+const pwFields = ["password", "confirm"];
+const shy = () => $("pip").classList.toggle("shy", pwFields.includes(document.activeElement?.id) && $("password").type === "password");
+pwFields.forEach(id => { $(id).addEventListener("focus", () => { shy(); say("I'm not looking! 🙈"); }); $(id).addEventListener("blur", shy); });
+$("peek").onclick = () => {
+  const show = $("password").type === "password";
+  $("password").type = $("confirm").type = show ? "text" : "password";
+  $("peek").textContent = show ? "Hide" : "Show"; shy(); if (show) say("Peeking… 👀");
+};
+$("password").addEventListener("input", e => {
+  const v = e.target.value, score = [v.length >= 8, /[A-Z]/.test(v) && /[a-z]/.test(v), /\d/.test(v), /[^A-Za-z0-9]/.test(v), v.length >= 12].filter(Boolean).length;
+  $("meter").style.width = score * 20 + "%";
+  $("meter").style.background = score < 3 ? "var(--bad)" : score < 4 ? "var(--warn)" : "var(--ok)";
+});
+
+$("form").onsubmit = async e => {
+  e.preventDefault();
+  const fail = msg => { $("err").textContent = msg; mood("sad"); say("Oops! 😬"); $("form").classList.remove("shake"); void $("form").offsetWidth; $("form").classList.add("shake"); };
+  if (!$("email").value || !$("password").value) return fail("Enter your email and password");
+  if (mode === "signup" && $("password").value.length < 8) return fail("Password must be at least 8 characters");
+  if (mode === "signup" && $("password").value !== $("confirm").value) return fail("Passwords don't match");
+  $("submit").disabled = true; $("err").textContent = "";
+  try {
+    const r = await fetch(`/api/${mode}`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: $("email").value, password: $("password").value }) });
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    mood("happy"); say("Off we go! 🚀"); $("pip").classList.remove("shy"); $("pip").classList.add("fly");
+    setTimeout(() => location.href = mode === "signup" ? "/#settings" : "/", 750);
+  } catch (ex) { fail(ex.message); $("submit").disabled = false; }
+};
+
+fetch("/api/me").then(r => { if (r.ok) location.href = "/"; });
+render();
+</script>
+</body>
+</html>

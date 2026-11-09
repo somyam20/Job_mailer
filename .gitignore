@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# JobMailer runtime data: database, resumes, encryption key (never commit)
+data/
+*.db
+secret.key

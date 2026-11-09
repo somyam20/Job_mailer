@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JobMailer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='13' fill='%235b5bf7'/%3E%3Cpath d='M11 24.5 37 13l-6.5 23-7.2-7.6-5.3 4.1.7-7.3z' fill='%23fff'/%3E%3C/svg%3E">
+<script>try{const m=localStorage.getItem("jm_mode")||"auto";document.documentElement.dataset.mode=m==="dark"||(m==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";document.documentElement.dataset.accent=localStorage.getItem("jm_accent")||"indigo"}catch{}</script>
+<link rel="stylesheet" href="theme.css">
+<style>
+  header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 12px 24px;
+    background: var(--glass); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+  header .spacer { flex: 1; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 6px 12px;
+    border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+  .chip a { color: inherit; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff;
+    background: linear-gradient(135deg, var(--a1), var(--a2)); cursor: pointer; border: 0; padding: 0; box-shadow: none; }
+  .menu { position: absolute; right: 0; top: calc(100% + 8px); background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; box-shadow: var(--shadow); padding: 6px; min-width: 220px; z-index: 20; }
+  .menu .who { padding: 8px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+  .menu button { width: 100%; background: transparent; color: var(--ink); box-shadow: none; justify-content: flex-start; font-weight: 500; }
+  .menu button:hover { background: var(--surface-2); transform: none; }
+  @media (max-width: 700px) { header { padding: 10px 16px; } header .hide-sm { display: none; } }
+
+  .layout { display: grid; grid-template-columns: 250px 1fr; gap: 20px; padding: 20px 24px; max-width: 1440px; margin: auto; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; padding: 16px; } }
+  .panel { background: var(--glass); backdrop-filter: blur(12px); border: 1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); }
+
+  /* sidebar */
+  aside h3 { margin: 0 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .ring { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .ring svg { width: 74px; height: 74px; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 8; }
+  .ring .track { stroke: var(--line); } .ring .val { stroke: url(#ringg); stroke-linecap: round; transition: stroke-dashoffset .6s; }
+  .ring b { font-size: 22px; display: block; line-height: 1; }
+  .days { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow-y: auto; }
+  @media (max-width: 900px) { .days { flex-direction: row; overflow-x: auto; max-height: none; } .day { flex: none; } }
+  .day { padding: 9px 12px; border-radius: 10px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; align-items: center;
+    background: transparent; color: var(--ink); box-shadow: none; font-weight: 500; width: 100%; }
+  .day:hover { background: var(--surface-2); transform: none; box-shadow: none; }
+  .day.active { background: var(--a-soft); color: var(--a-ink); font-weight: 700; }
+  .day small { color: var(--muted); font-weight: 600; }
+
+  /* stepper tabs */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  @media (max-width: 640px) { .steps { grid-template-columns: 1fr; } }
+  .step { background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: none; padding: 12px 14px;
+    border-radius: 14px; text-align: left; display: flex; gap: 12px; align-items: center; }
+  .step .n { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); color: var(--muted); font-weight: 800; flex: none; }
+  .step small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; }
+  .step.on { border-color: var(--a1); background: var(--a-soft); }
+  .step.on .n { background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff; }
+  .step:hover:not(.on) { border-color: color-mix(in srgb, var(--a1) 40%, var(--line)); transform: translateY(-1px); }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar .grow { flex: 1; min-width: 200px; }
+  .search { max-width: 260px; }
+
+  .addbar { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; }
+  @media (max-width: 640px) { .addbar { grid-template-columns: 1fr; } }
+  details.bulk { margin: 10px 0 4px; } details.bulk summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 13px; }
+
+  table { width: 100%; border-collapse: separate; border-spacing: 0; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; background: var(--surface-2); }
+  tbody tr { transition: background .15s; } tbody tr:hover { background: var(--surface-2); }
+  .co { font-weight: 700; } .co small { display: block; font-weight: 400; }
+
+  .pill { font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 700; text-transform: capitalize; white-space: nowrap;
+    background: var(--surface-2); color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+  .pill.pending { background: var(--warn-soft); color: var(--warn); }
+  .pill.searching { background: var(--info-soft); color: var(--info); }
+  .pill.searching::before { content: ""; width: 8px; height: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pill.searched { background: var(--a-soft); color: var(--a-ink); }
+  .pill.drafted { background: color-mix(in srgb, var(--a2) 15%, transparent); color: var(--a2); }
+  .pill.sent { background: var(--ok-soft); color: var(--ok); } .pill.error { background: var(--bad-soft); color: var(--bad); }
+
+  .contact { display: flex; gap: 8px; align-items: center; font-size: 13px; padding: 3px 0; flex-wrap: wrap; }
+  .v { font-weight: 800; width: 18px; text-align: center; } .v.yes { color: var(--ok); } .v.no { color: var(--warn); }
+  .kind { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
+  .kind.hr { background: var(--a-soft); color: var(--a-ink); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); gap: 16px; }
+  .card { border: 1px solid var(--line); border-radius: 16px; padding: 16px; background: var(--surface); display: flex; flex-direction: column; gap: 10px;
+    transition: box-shadow .2s, transform .2s; }
+  .card:hover { box-shadow: var(--shadow); }
+  .card.sent { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+  .card h4 { margin: 0; font-size: 16px; }
+  .card .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .card .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .card .actions .send { margin-left: auto; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .attach { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; padding: 6px 10px; border-radius: 9px; background: var(--surface-2); color: var(--muted); }
+
+  .empty { text-align: center; padding: 44px 16px; color: var(--muted); }
+  .empty .big { font-size: 44px; display: block; margin-bottom: 6px; animation: float 3s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-8px); } }
+  .empty b { color: var(--ink); display: block; font-size: 15px; margin-bottom: 2px; }
+
+  /* settings modal */
+  .modal { position: fixed; inset: 0; background: rgba(10,10,30,.5); backdrop-filter: blur(4px); display: flex; justify-content: center;
+    align-items: flex-start; padding: 40px 16px; overflow-y: auto; z-index: 30; animation: fade .2s; }
+  @keyframes fade { from { opacity: 0; } }
+  .sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 24px; width: 100%; max-width: 680px; box-shadow: var(--shadow); animation: pop .25s; }
+  @keyframes pop { from { transform: translateY(12px) scale(.98); opacity: 0; } }
+  .sheet h2 { margin: 0; } .sheet h4 { margin: 22px 0 10px; display: flex; gap: 8px; align-items: center; }
+  .sheet h4 .ico { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--a-soft); }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .fields label { font-size: 12px; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 5px; }
+  .fields .wide { grid-column: 1 / -1; }
+  @media (max-width: 600px) { .fields { grid-template-columns: 1fr; } }
+  .hint { background: var(--a-soft); color: var(--a-ink); border-radius: 12px; padding: 12px 14px; margin-top: 14px; font-weight: 500; }
+  .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; transition: .2s; color: var(--muted); }
+  .drop:hover, .drop.over { border-color: var(--a1); background: var(--a-soft); color: var(--a-ink); }
+  .sheet .foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; position: sticky; bottom: -24px; background: var(--surface); padding: 12px 0 0; }
+  kbd { font: 11px/1 var(--font); padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs><linearGradient id="ringg"><stop offset="0" stop-color="var(--a1)"/><stop offset="1" stop-color="var(--a2)"/></linearGradient></defs></svg>
+
+<header>
+  <div data-logo></div>
+  <span class="spacer"></span>
+  <span id="resumeState" class="chip hide-sm"></span>
+  <div><button class="ghost icon" data-theme-picker title="Theme & wallpaper" aria-label="Theme and wallpaper">🎨</button></div>
+  <button class="ghost" onclick="openSettings()" title="Settings">⚙ <span class="hide-sm">Settings</span></button>
+  <div style="position:relative">
+    <button class="avatar" id="avatar" onclick="toggleMenu()" aria-label="Account menu">?</button>
+    <div class="menu hidden" id="menu">
+      <div class="who"><b id="menuName"></b><div class="muted" id="userEmail"></div></div>
+      <button onclick="openSettings()">⚙ Settings</button>
+      <button onclick="logout()">↪ Log out</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout above">
+  <aside class="panel">
+    <h3>Today's goal</h3>
+    <div class="ring">
+      <svg viewBox="0 0 80 80"><circle class="track" cx="40" cy="40" r="32"/><circle class="val" id="ringVal" cx="40" cy="40" r="32" stroke-dasharray="201" stroke-dashoffset="201"/></svg>
+      <div><b><span id="todayCount">0</span><span class="muted" style="font-size:14px"> / <span id="limit">40</span></span></b>
+        <span class="muted" id="ringMsg">Let's start!</span></div>
+    </div>
+    <h3>Days</h3>
+    <input type="date" id="dayPicker" onchange="selectDay(this.value)" style="margin-bottom:10px" aria-label="Pick a day">
+    <div class="days" id="dayList"></div>
+  </aside>
+
+  <main class="panel">
+    <div class="steps" role="tablist">
+      <button class="step on" data-tab="add" onclick="showTab('add')"><span class="n">1</span><span>Add companies<small id="c1">0 added</small></span></button>
+      <button class="step" data-tab="approve" onclick="showTab('approve')"><span class="n">2</span><span>Find emails<small id="c2">0 waiting</small></span></button>
+      <button class="step" data-tab="mails" onclick="showTab('mails')"><span class="n">3</span><span>Write & send<small id="c3">0 sent</small></span></button>
+    </div>
+
+    <!-- STEP 1 -->
+    <div id="tab-add">
+      <div class="addbar">
+        <input id="company" placeholder="Company name, e.g. Infosys" aria-label="Company">
+        <input id="designation" placeholder="Designation, e.g. Python Developer" aria-label="Designation">
+        <button onclick="addApp()">＋ Add</button>
+      </div>
+      <details class="bulk">
+        <summary>Paste many at once</summary>
+        <textarea id="bulk" rows="5" style="margin-top:8px" placeholder="One per line:&#10;Google, Software Engineer&#10;TCS, Data Analyst"></textarea>
+        <button style="margin-top:8px" onclick="bulkAdd()">Add all</button>
+      </details>
+      <div class="toolbar" style="margin-top:14px">
+        <span class="grow muted">Tip: press <kbd>Enter</kbd> in the designation box to add.</span>
+        <input class="search" placeholder="🔍 Filter…" oninput="state.q=this.value.toLowerCase(); render()">
+        <button class="ghost" onclick="downloadExcel()">⬇ Excel</button>
+      </div>
+      <div id="addList"></div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="tab-approve" class="hidden">
+      <div class="toolbar">
+        <span class="grow muted">Tick the companies to search. Each email found gets checked: format, a working mail server, and a domain that matches the company.</span>
+        <button class="ghost" onclick="selectAll()">Select all waiting</button>
+        <button onclick="approveSelected()">✔ Approve & search</button>
+      </div>
+      <div id="approveList"></div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div id="tab-mails" class="hidden">
+      <div class="toolbar">
+        <span class="grow muted">Each email is written from your resume for that role. Edit it, then send it or download a .eml draft with your resume attached.</span>
+        <button onclick="generateAll()" id="genBtn">✨ Write all emails</button>
+      </div>
+      <div class="grid" id="cards"></div>
+    </div>
+  </main>
+</div>
+
+<div class="modal hidden" id="settings" onclick="if (event.target === this) closeSettings()">
+  <form class="sheet" onsubmit="event.preventDefault(); saveSettings()">
+    <div class="row" style="justify-content:space-between"><h2>Settings</h2>
+      <button type="button" class="ghost icon" onclick="closeSettings()" aria-label="Close">✕</button></div>
+    <div id="setupHint" class="hint hidden">👋 Welcome! Add your Gemini API key and your details so JobMailer can write and send emails for you.</div>
+
+    <h4><span class="ico">🙋</span> Your profile <span class="muted">used to write your emails</span></h4>
+    <div class="fields">
+      <label>Full name<input id="s_name"></label>
+      <label>Phone<input id="s_phone"></label>
+      <label class="wide">LinkedIn URL<input id="s_linkedin"></label>
+      <label class="wide">Summary<textarea id="s_summary" rows="3" placeholder="Experience, key skills, achievements"></textarea></label>
+      <div class="wide">
+        <div class="drop" id="drop" onclick="$('resumeFile').click()">📄 <b>Resume (PDF)</b> — click or drop a file here <span id="s_resume"></span></div>
+        <input type="file" id="resumeFile" accept=".pdf" hidden onchange="uploadResume()">
+      </div>
+    </div>
+
+    <h4><span class="ico">📮</span> Sending email <span class="muted">your mailbox · Gmail needs an App Password</span></h4>
+    <div class="fields">
+      <label>SMTP host<input id="s_smtp_host" placeholder="smtp.gmail.com"></label>
+      <label>SMTP port<input id="s_smtp_port" placeholder="587"></label>
+      <label>Email (username)<input id="s_smtp_user" type="email" autocomplete="off"></label>
+      <label>App password<input id="s_smtp_password" type="password" autocomplete="new-password"></label>
+    </div>
+
+    <h4><span class="ico">✨</span> Gemini</h4>
+    <div class="fields">
+      <label class="wide">API key<input id="s_gemini_api_key" type="password" autocomplete="off"></label>
+      <label>Model<input id="s_gemini_model" placeholder="gemini-2.5-flash"></label>
+      <label>Daily company limit<input id="s_daily_limit" type="number" min="1" max="500"></label>
+    </div>
+    <div class="foot"><button type="button" class="ghost" onclick="closeSettings()">Cancel</button><button>Save settings</button></div>
+  </form>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="theme.js"></script>
+<script>
+const api = async (url, opts = {}) => {
+  const r = await fetch(url, { headers: opts.body && !(opts.body instanceof FormData) ? {"Content-Type":"application/json"} : {}, ...opts });
+  if (r.status === 401) { location.href = "/login.html"; throw new Error("Please log in"); }
+  if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail } catch {} throw new Error(m); }
+  return r.json();
+};
+const $ = id => document.getElementById(id);
+const esc = s => (s ?? "").toString().replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const toast = m => { const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 3500); };
+const empty = (icon, title, text) => `<div class="empty"><span class="big">${icon}</span><b>${title}</b>${text}</div>`;
+
+let state = { day: null, today: null, apps: [], tab: "add", poll: null, q: "" };
+
+async function loadDays() {
+  const d = await api("/api/days");
+  state.today = d.today; if (!state.day) state.day = d.today;
+  $("limit").textContent = d.limit;
+  const t = d.days.find(x => x.day === d.today)?.total || 0, pct = Math.min(1, t / d.limit);
+  $("todayCount").textContent = t;
+  $("ringVal").style.strokeDashoffset = 201 * (1 - pct);
+  $("ringMsg").textContent = pct >= 1 ? "Goal reached 🎉" : pct >= .5 ? "Over halfway 💪" : t ? "Keep going!" : "Let's start!";
+  $("dayPicker").value = state.day;
+  const days = d.days.some(x => x.day === d.today) ? d.days : [{day: d.today, total: 0}, ...d.days];
+  const label = day => day === d.today ? "Today" : new Date(day + "T00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  $("dayList").innerHTML = days.map(x => `<button class="day ${x.day === state.day ? "active" : ""}" onclick="selectDay('${x.day}')">
+     <span>${label(x.day)}</span><small>${x.sent || 0} ✉ · ${x.total}</small></button>`).join("");
+}
+
+async function selectDay(day) { state.day = day; await refresh(); }
+
+async function refresh() {
+  if (!state.day) await loadDays();
+  state.apps = await api(`/api/applications?day=${state.day}`);
+  await loadDays();
+  render();
+  const busy = state.apps.some(a => a.status === "searching");
+  clearInterval(state.poll); if (busy) state.poll = setInterval(refresh, 4000);
+}
+
+function showTab(t) {
+  state.tab = t;
+  document.querySelectorAll(".step").forEach(e => e.classList.toggle("on", e.dataset.tab === t));
+  ["add","approve","mails"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
+  render();
+}
+
+const pill = s => `<span class="pill ${s}">${s}</span>`;
+const contactLine = (c, pick) => `<label class="contact">
+    ${pick ? `<input type="checkbox" ${c.selected ? "checked" : ""} onchange="pickContact(${c.id}, this.checked)">` : ""}
+    <span class="v ${c.verified ? "yes" : "no"}" title="${esc(c.reason)}">${c.verified ? "✔" : "⚠"}</span>
+    <span>${esc(c.email)}</span><span class="kind ${c.kind}">${c.kind}</span>
+    ${!pick && c.source_url ? `<a href="${esc(c.source_url)}" target="_blank" rel="noopener" class="muted">source ↗</a>` : ""}</label>`;
+
+function render() {
+  const all = state.apps;
+  const A = all.filter(a => !state.q || (a.company + " " + a.designation).toLowerCase().includes(state.q));
+  $("c1").textContent = `${all.length} added`;
+  $("c2").textContent = `${all.filter(a => a.status === "pending").length} waiting · ${all.filter(a => a.status === "searching").length} searching`;
+  $("c3").textContent = `${all.filter(a => a.draft).length} written · ${all.filter(a => a.status === "sent").length} sent`;
+
+  $("addList").innerHTML = A.length ? `<div class="tablewrap"><table><thead><tr><th>#</th><th>Company</th><th>Designation</th><th>Status</th><th></th></tr></thead><tbody>
+    ${A.map((a, i) => `<tr><td class="muted">${i+1}</td><td class="co">${esc(a.company)}</td><td>${esc(a.designation)}</td>
+      <td>${pill(a.status)}</td><td style="text-align:right"><button class="danger" onclick="del(${a.id})" title="Remove">✕</button></td></tr>`).join("")}
+    </tbody></table></div>` : empty("🏢", state.q ? "No matches" : "No companies yet", state.q ? "Try another filter." : "Add the first company you're applying to today.");
+
+  $("approveList").innerHTML = all.length ? `<div class="tablewrap"><table><thead><tr><th></th><th>Company</th><th>Status</th><th>Emails found</th></tr></thead><tbody>
+    ${all.map(a => {
+      const canPick = ["pending", "error", "searched"].includes(a.status);
+      return `<tr><td><input type="checkbox" class="pick" value="${a.id}" ${canPick ? "" : "disabled"} aria-label="Select ${esc(a.company)}"></td>
+        <td class="co">${esc(a.company)}<small class="muted">${esc(a.designation)}</small>
+          ${a.website ? `<small><a href="${esc(a.website)}" target="_blank" rel="noopener">${esc(a.website.replace(/^https?:\/\//, ""))}</a></small>` : ""}</td>
+        <td>${pill(a.status)}</td>
+        <td>${a.contacts.map(c => contactLine(c, false)).join("") || `<span class="muted">${esc(a.notes || (a.status === "searching" ? "Searching the web…" : "—"))}</span>`}</td></tr>`;
+    }).join("")}</tbody></table></div>` : empty("🔎", "Nothing to search yet", "Add companies in step 1 first.");
+
+  // don't wipe a draft the user is typing in
+  if ($("cards").contains(document.activeElement)) return;
+  const ready = all.filter(a => a.contacts.length || a.draft);
+  $("cards").innerHTML = ready.map(card).join("") || `<div style="grid-column:1/-1">${empty("✉️", "No emails yet", "Find emails in step 2, then write them here.")}</div>`;
+}
+
+function card(a) {
+  const d = a.draft;
+  return `<div class="card ${a.status === "sent" ? "sent" : ""}">
+    <div class="head"><div><h4>${esc(a.company)}</h4><div class="muted">${esc(a.designation)}</div></div>${pill(a.status)}</div>
+    <div><div class="muted" style="font-weight:700">To</div>${a.contacts.map(c => contactLine(c, true)).join("") || '<span class="muted">no emails found</span>'}</div>
+    <div class="row"><input id="nc-${a.id}" placeholder="Add an email by hand" onkeydown="event.key==='Enter'&&addContact(${a.id})"><button class="ghost" onclick="addContact(${a.id})">＋</button></div>
+    ${d ? `
+      <input id="s-${a.id}" value="${esc(d.subject)}" aria-label="Subject" style="font-weight:600">
+      <textarea id="b-${a.id}" rows="10" aria-label="Email body">${esc(d.body)}</textarea>
+      <div><span class="attach">📎 Resume attached${d.sent_at ? " · ✅ sent " + new Date(d.sent_at).toLocaleString() : ""}</span></div>
+      <div class="actions">
+        <button class="ghost" onclick="saveDraft(${a.id})">💾 Save</button>
+        <button class="ghost" onclick="regen(${a.id})">↻ Rewrite</button>
+        <button class="ghost" onclick="copyMail(${a.id})">⧉ Copy</button>
+        <button class="ghost" onclick="saveDraft(${a.id}).then(() => location.href='/api/applications/${a.id}/eml')">⬇ .eml</button>
+        <button class="send" onclick="sendMail(${a.id})" ${d.sent_at ? "disabled" : ""}>${d.sent_at ? "Sent ✓" : "🚀 Send"}</button>
+      </div>` : `<button onclick="regen(${a.id})">✨ Write email</button>`}
+  </div>`;
+}
+
+// ---------- actions ----------
+async function addApp() {
+  try {
+    await api("/api/applications", { method: "POST", body: JSON.stringify({ company: $("company").value, designation: $("designation").value, day: state.day }) });
+    toast(`Added ${$("company").value} ✓`);
+    $("company").value = ""; $("designation").value = ""; $("company").focus(); refresh();
+  } catch (e) { toast(e.message); }
+}
+async function bulkAdd() {
+  const lines = $("bulk").value.split("\n").map(l => l.trim()).filter(Boolean);
+  let ok = 0;
+  for (const l of lines) {
+    const [company, ...rest] = l.split(",");
+    try { await api("/api/applications", { method: "POST", body: JSON.stringify({ company, designation: rest.join(","), day: state.day }) }); ok++; }
+    catch (e) { toast(`${company}: ${e.message}`); }
+  }
+  $("bulk").value = ""; toast(`Added ${ok} of ${lines.length}`); refresh();
+}
+async function del(id) { if (confirm("Remove this company?")) { await api(`/api/applications/${id}`, { method: "DELETE" }); refresh(); } }
+function selectAll() { document.querySelectorAll(".pick:not(:disabled)").forEach(c => c.checked = true); }
+async function approveSelected() {
+  const ids = [...document.querySelectorAll(".pick:checked")].map(c => +c.value);
+  if (!ids.length) return toast("Select at least one company");
+  try { await api("/api/approve", { method: "POST", body: JSON.stringify({ ids }) }); toast(`Searching ${ids.length} companies…`); refresh(); }
+  catch (e) { toast(e.message); }
+}
+async function pickContact(id, selected) { await api(`/api/contacts/${id}`, { method: "PATCH", body: JSON.stringify({ selected }) }); }
+async function addContact(id) {
+  const email = $("nc-" + id).value.trim(); if (!email) return;
+  try { await api(`/api/applications/${id}/contacts`, { method: "POST", body: JSON.stringify({ email, kind: "hr" }) }); document.activeElement.blur(); refresh(); } catch (e) { toast(e.message); }
+}
+async function regen(id) {
+  toast("Writing email…");
+  try { await api("/api/generate", { method: "POST", body: JSON.stringify({ ids: [id] }) }); document.activeElement.blur(); refresh(); } catch (e) { toast(e.message); }
+}
+async function generateAll() {
+  const ids = state.apps.filter(a => a.contacts.length && !a.draft).map(a => a.id);
+  if (!ids.length) return toast("Nothing new to write");
+  $("genBtn").disabled = true;
+  for (const [i, id] of ids.entries()) {
+    $("genBtn").textContent = `Writing ${i+1} of ${ids.length}…`;
+    try { await api("/api/generate", { method: "POST", body: JSON.stringify({ ids: [id] }) }); } catch (e) { toast(e.message); }
+  }
+  $("genBtn").disabled = false; $("genBtn").textContent = "✨ Write all emails"; refresh();
+}
+async function saveDraft(id) {
+  await api(`/api/applications/${id}/draft`, { method: "PUT", body: JSON.stringify({ subject: $("s-" + id).value, body: $("b-" + id).value }) });
+  toast("Saved ✓");
+}
+function copyMail(id) {
+  const a = state.apps.find(x => x.id === id);
+  const to = a.contacts.filter(c => c.selected).map(c => c.email).join(", ");
+  navigator.clipboard.writeText(`To: ${to}\nSubject: ${$("s-" + id).value}\n\n${$("b-" + id).value}`); toast("Copied ✓");
+}
+async function sendMail(id) {
+  const a = state.apps.find(x => x.id === id);
+  const to = a.contacts.filter(c => c.selected).map(c => c.email).join(", ");
+  if (!to) return toast("Tick at least one recipient");
+  if (!confirm(`Send to ${to}?`)) return;
+  try { await saveDraft(id); await api(`/api/applications/${id}/send`, { method: "POST" }); toast("Sent 🚀"); document.activeElement.blur(); refresh(); } catch (e) { toast(e.message); }
+}
+function downloadExcel() { location.href = `/api/excel?day=${state.day}`; }
+
+// ---------- account + settings ----------
+const FIELDS = ["name","phone","linkedin","summary","smtp_host","smtp_port","smtp_user","smtp_password","gemini_api_key","gemini_model","daily_limit"];
+const SECRET = ["smtp_password","gemini_api_key"];
+
+async function loadMe() {
+  const me = await api("/api/me");
+  $("userEmail").textContent = me.email; $("menuName").textContent = me.name || "Your account";
+  $("avatar").textContent = (me.name || me.email).trim()[0].toUpperCase();
+  $("resumeState").className = "chip hide-sm" + (me.has_resume ? "" : " warn");
+  $("resumeState").innerHTML = me.has_resume ? `📎 <a href="/api/resume" target="_blank">Resume</a>` : `⚠ <a href="#" onclick="openSettings();return false">Add your resume</a>`;
+  return me;
+}
+function toggleMenu() { $("menu").classList.toggle("hidden"); }
+document.addEventListener("click", e => { if (!e.target.closest("#menu, #avatar")) $("menu").classList.add("hidden"); });
+
+async function openSettings(firstRun = false) {
+  $("menu").classList.add("hidden");
+  const s = await api("/api/settings");
+  FIELDS.forEach(f => $("s_" + f).value = s[f] ?? "");
+  SECRET.forEach(f => $("s_" + f).placeholder = s[f + "_set"] ? "•••••••• saved — leave blank to keep" : "not set");
+  $("s_resume").textContent = s.has_resume ? "· uploaded ✔" : "· not uploaded yet";
+  $("setupHint").classList.toggle("hidden", !firstRun);
+  $("settings").classList.remove("hidden");
+}
+function closeSettings() { $("settings").classList.add("hidden"); if (location.hash === "#settings") history.replaceState(null, "", "/"); }
+async function saveSettings() {
+  const body = Object.fromEntries(FIELDS.map(f => [f, $("s_" + f).value]));
+  try { await api("/api/settings", { method: "PUT", body: JSON.stringify(body) }); toast("Settings saved ✓"); closeSettings(); loadMe(); refresh(); }
+  catch (e) { toast(e.message); }
+}
+async function uploadResume(file) {
+  const f = file || $("resumeFile").files[0]; if (!f) return;
+  const fd = new FormData(); fd.append("file", f);
+  try {
+    const r = await api("/api/resume", { method: "POST", body: fd });
+    toast(`Resume uploaded ✓ (${r.chars_extracted} characters read)`); $("s_resume").textContent = "· uploaded ✔"; loadMe();
+  } catch (e) { toast(e.message); }
+}
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => uploadResume(e.dataTransfer.files[0]));
+async function logout() { await fetch("/api/logout", { method: "POST" }); location.href = "/login.html"; }
+
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeSettings(); $("menu").classList.add("hidden"); } });
+$("designation").addEventListener("keydown", e => e.key === "Enter" && addApp());
+loadMe().then(me => { refresh(); if (location.hash === "#settings" || !me.configured) openSettings(true); });
+</script>
+</body>
+</html>
