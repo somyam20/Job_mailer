@@ -3,14 +3,16 @@ from datetime import date, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy import (URL, Boolean, Date, DateTime, ForeignKey, Integer, String, Text, create_engine, inspect,
-                        text)
+from sqlalchemy import (URL, Boolean, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, create_engine,
+                        inspect, text)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT / "data"
-DATA_DIR.mkdir(exist_ok=True)
 load_dotenv(ROOT / ".env")
+ON_VERCEL = bool(os.getenv("VERCEL"))
+# Serverless hosts only allow writing to /tmp, which is wiped between runs; real data must live in Postgres there.
+DATA_DIR = Path(os.getenv("DATA_DIR") or ("/tmp/jobmailer" if ON_VERCEL else ROOT / "data"))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 SQLITE_URL = f"sqlite:///{DATA_DIR / 'jobs.db'}"
 
 
@@ -30,10 +32,15 @@ def database_url() -> URL | str:
 def make_engine(url):
     if str(url).startswith("sqlite"):
         return create_engine(url, connect_args={"check_same_thread": False})
-    # pre_ping/recycle: Supabase's pooler drops idle connections
-    return create_engine(url, pool_pre_ping=True, pool_recycle=300, pool_size=5, max_overflow=5)
+    # pre_ping/recycle: Supabase's pooler drops idle connections. Serverless runs many small instances,
+    # so keep each one's pool tiny to stay under the database's connection limit.
+    size = (1, 2) if ON_VERCEL else (5, 5)
+    return create_engine(url, pool_pre_ping=True, pool_recycle=300, pool_size=size[0], max_overflow=size[1])
 
 
+if ON_VERCEL and not (os.getenv("DB_HOST") or os.getenv("DATABASE_URL")):
+    raise RuntimeError("On Vercel, set DB_HOST/DB_USER/DB_PASSWORD (or DATABASE_URL) to a Postgres database: "
+                       "SQLite in /tmp is wiped between requests.")
 engine = make_engine(database_url())
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
@@ -65,6 +72,16 @@ class UserSetting(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     key: Mapped[str] = mapped_column(String(50), primary_key=True)
     value: Mapped[str] = mapped_column(Text)  # secrets are stored encrypted
+
+
+class Resume(Base):
+    """Stored in the database (not on disk) so it survives serverless deploys."""
+    __tablename__ = "resumes"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    pdf: Mapped[bytes] = mapped_column(LargeBinary)
+    text: Mapped[str] = mapped_column(Text, default="")
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class Application(Base):

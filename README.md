@@ -85,9 +85,10 @@ job_mailer/
 │   └── theme.js       # theme picker, live wallpaper, logo
 ├── data/              # created on first run (git-ignore this folder)
 │   ├── jobs.db        # SQLite database (when not using Postgres)
-│   ├── resumes/       # <user_id>.pdf and extracted <user_id>.txt
+│   ├── resumes/       # old resume files (now imported into the database automatically)
 │   └── secret.key     # encryption key for saved passwords/API keys
-├── migrate_to_postgres.py   # one-time copy SQLite → Postgres
+├── migrate_to_postgres.py   # one-time copy SQLite → Postgres (incl. resume files)
+├── pyproject.toml     # dependencies + Vercel entrypoint
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -131,6 +132,30 @@ Open **http://127.0.0.1:8000**. You'll be sent to the sign-in page. Create an ac
 
 > To let other devices on your network use it: `uvicorn backend.main:app --host 0.0.0.0 --port 8000`.
 > For use over the internet, put it behind HTTPS (see [Security notes](#security-notes)).
+
+### Deploy to Vercel
+The repo includes `pyproject.toml` with `[tool.vercel] entrypoint = "backend.main:app"`, so Vercel detects the
+FastAPI app. Vercel runs it as serverless functions: only `/tmp` can be written and it is wiped between runs. So:
+
+1. **Use Postgres (Supabase).** SQLite won't work, and the app refuses to start on Vercel without it.
+2. In *Vercel → Project → Settings → Environment Variables*, add:
+
+   | Variable | Value |
+   |---|---|
+   | `DB_HOST` | `aws-0-ap-southeast-1.pooler.supabase.com` (your Session pooler host) |
+   | `DB_PORT` | `5432` |
+   | `DB_NAME` | `postgres` |
+   | `DB_USER` | `postgres.<project-ref>` |
+   | `DB_PASSWORD` | your database password |
+   | `APP_SECRET_KEY` | **required.** The contents of your local `data/secret.key` (so existing saved secrets still decrypt), or a new key from `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+
+3. If you have local data, copy it into Supabase first with `python migrate_to_postgres.py`. Resumes are copied too.
+4. Redeploy.
+
+Notes:
+- Resumes are stored **in the database**, so they survive deploys. Maximum 4 MB, because Vercel limits request size.
+- The email search runs after the response, inside the same function. Approve a few companies at a time so it finishes
+  within your plan's function time limit.
 
 ---
 
@@ -197,7 +222,7 @@ Nothing to set up. Data is stored in `data/jobs.db`, and tables are created on f
    ```
 3. Restart the app. Tables are created automatically if they're missing.
 
-> Resumes (`data/resumes/`) and `data/secret.key` stay on disk, not in the database. Back them up as well.
+> Resumes are stored in the database. `data/secret.key` stays on disk: back it up, or set `APP_SECRET_KEY`.
 
 ### Upgrading from the single-user version
 On startup, an old `jobs.db` is upgraded in place. The **first account that signs up** takes over the existing

@@ -8,7 +8,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Cookie, HTTPException
 from sqlalchemy import delete
 
-from .db import DATA_DIR, AuthSession, SessionLocal, User
+from .db import DATA_DIR, ON_VERCEL, AuthSession, SessionLocal, User
 
 SESSION_DAYS = 30
 COOKIE = "jm_session"
@@ -62,6 +62,9 @@ def current_user(jm_session: str | None = Cookie(default=None)) -> User:
 # ---------- encryption for stored secrets (SMTP password, Gemini key) ----------
 def _fernet() -> Fernet:
     key = os.getenv("APP_SECRET_KEY")
+    if not key and ON_VERCEL:
+        # each serverless instance would invent its own key and could never read the others' secrets
+        raise HTTPException(500, "Server misconfigured: set APP_SECRET_KEY in the Vercel environment variables")
     if not key:
         path = DATA_DIR / "secret.key"
         if not path.exists():

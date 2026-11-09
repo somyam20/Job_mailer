@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, HTTPException, Response, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -22,12 +22,11 @@ from sqlalchemy.orm import selectinload
 
 from . import auth, llm
 from .auth import current_user
-from .db import DATA_DIR, Application, Contact, EmailDraft, SessionLocal, User, UserSetting
+from .db import DATA_DIR, ON_VERCEL, Application, Contact, EmailDraft, Resume, SessionLocal, User, UserSetting
 from .verify import verify
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
-RESUME_DIR = DATA_DIR / "resumes"
-RESUME_DIR.mkdir(exist_ok=True)
+MAX_RESUME_BYTES = 4 * 1024 * 1024  # Vercel rejects request bodies over ~4.5 MB
 
 # Every per-user setting and its default. Secrets are encrypted at rest and never sent back to the browser.
 SETTINGS = {
@@ -65,13 +64,52 @@ def daily_limit(cfg: dict) -> int:
         return 40
 
 
-def resume_pdf(user_id: int) -> Path:
-    return RESUME_DIR / f"{user_id}.pdf"
+# ---------- resumes (stored in the database so they survive serverless deploys) ----------
+def pdf_text(pdf: bytes) -> str:
+    try:
+        from pypdf import PdfReader
+        return "\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(pdf)).pages)
+    except Exception:
+        return ""
+
+
+def save_resume(user_id: int, pdf: bytes, txt: str | None = None) -> str:
+    txt = pdf_text(pdf) if txt is None else txt
+    with SessionLocal() as s:
+        s.merge(Resume(user_id=user_id, pdf=pdf, text=txt, uploaded_at=datetime.now()))
+        s.commit()
+    return txt
+
+
+def resume_pdf(user_id: int) -> bytes | None:
+    with SessionLocal() as s:
+        return s.scalar(select(Resume.pdf).where(Resume.user_id == user_id))
 
 
 def resume_text(user_id: int) -> str:
-    p = RESUME_DIR / f"{user_id}.txt"
-    return p.read_text(encoding="utf-8") if p.exists() else ""
+    with SessionLocal() as s:
+        return s.scalar(select(Resume.text).where(Resume.user_id == user_id)) or ""
+
+
+def has_resume(user_id: int) -> bool:
+    with SessionLocal() as s:
+        return s.scalar(select(Resume.user_id).where(Resume.user_id == user_id)) is not None
+
+
+def import_disk_resumes():
+    """Earlier versions kept resumes in data/resumes/<user_id>.pdf; move them into the database once."""
+    folder = DATA_DIR / "resumes"
+    if ON_VERCEL or not folder.is_dir():
+        return
+    with SessionLocal() as s:
+        users = set(s.scalars(select(User.id)))
+    for pdf in folder.glob("*.pdf"):
+        if pdf.stem.isdigit() and int(pdf.stem) in users and not has_resume(int(pdf.stem)):
+            txt = pdf.with_suffix(".txt")
+            save_resume(int(pdf.stem), pdf.read_bytes(), txt.read_text(encoding="utf-8") if txt.exists() else None)
+
+
+import_disk_resumes()
 
 
 def claim_legacy_data(user_id: int):
@@ -95,10 +133,10 @@ def claim_legacy_data(user_id: int):
     }
     env.update({k: v for k, v in legacy.items() if k in SETTINGS and v})
     save_settings(user_id, {k: v for k, v in env.items() if v})
-    for ext in ("pdf", "txt"):
-        old = DATA_DIR / f"resume.{ext}"
-        if old.exists():
-            old.replace(RESUME_DIR / f"{user_id}.{ext}")
+    old = DATA_DIR / "resume.pdf"
+    if old.exists():
+        old_txt = DATA_DIR / "resume.txt"
+        save_resume(user_id, old.read_bytes(), old_txt.read_text(encoding="utf-8") if old_txt.exists() else None)
 
 
 # ---------- auth routes ----------
@@ -151,7 +189,7 @@ def logout(resp: Response, jm_session: str | None = Cookie(default=None)):
 @app.get("/api/me")
 def me(user: User = Depends(current_user)):
     cfg = settings(user.id)
-    return {"email": user.email, "name": cfg["name"], "has_resume": resume_pdf(user.id).exists(),
+    return {"email": user.email, "name": cfg["name"], "has_resume": has_resume(user.id),
             "configured": bool(cfg["gemini_api_key"])}
 
 
@@ -162,7 +200,7 @@ def get_settings(user: User = Depends(current_user)):
     for k in SECRETS:  # only say whether a secret is set
         cfg[k + "_set"] = bool(cfg[k])
         cfg[k] = ""
-    cfg["has_resume"] = resume_pdf(user.id).exists()
+    cfg["has_resume"] = has_resume(user.id)
     return cfg
 
 
@@ -195,22 +233,21 @@ def put_settings(body: SettingsIn, user: User = Depends(current_user)):
 async def upload_resume(file: UploadFile = File(...), user: User = Depends(current_user)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Please upload a PDF")
-    pdf = resume_pdf(user.id)
-    pdf.write_bytes(await file.read())
-    try:
-        from pypdf import PdfReader
-        txt = "\n".join(p.extract_text() or "" for p in PdfReader(pdf).pages)
-    except Exception:
-        txt = ""
-    (RESUME_DIR / f"{user.id}.txt").write_text(txt, encoding="utf-8")
+    pdf = await file.read()
+    if len(pdf) > MAX_RESUME_BYTES:
+        raise HTTPException(400, "Resume must be under 4 MB")
+    if not pdf.startswith(b"%PDF"):
+        raise HTTPException(400, "That file isn't a valid PDF")
+    txt = save_resume(user.id, pdf)
     return {"ok": True, "chars_extracted": len(txt)}
 
 
 @app.get("/api/resume")
 def get_resume(user: User = Depends(current_user)):
-    if not resume_pdf(user.id).exists():
+    pdf = resume_pdf(user.id)
+    if not pdf:
         raise HTTPException(404, "No resume uploaded")
-    return FileResponse(resume_pdf(user.id), media_type="application/pdf")
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": 'inline; filename="resume.pdf"'})
 
 
 # ---------- helpers ----------
@@ -469,9 +506,9 @@ def build_message(a: Application, user: User, cfg: dict) -> EmailMessage:
     msg["Subject"] = a.draft.subject
     msg.set_content(a.draft.body)
     pdf = resume_pdf(user.id)
-    if pdf.exists():
+    if pdf:
         name = (cfg["name"] or "Resume").replace(" ", "_") + "_Resume.pdf"
-        msg.add_attachment(pdf.read_bytes(), maintype="application", subtype="pdf", filename=name)
+        msg.add_attachment(pdf, maintype="application", subtype="pdf", filename=name)
     return msg
 
 

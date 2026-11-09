@@ -1,0 +1,21 @@
+[project]
+name = "jobmailer"
+version = "1.0.0"
+description = "Multi-user job application mailer: find HR emails, write tailored emails with Gemini, send with your resume."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
+    "sqlalchemy==2.0.36",
+    "openpyxl==3.1.5",
+    "google-genai==1.2.0",
+    "dnspython==2.7.0",
+    "python-multipart==0.0.20",
+    "python-dotenv==1.0.1",
+    "pypdf==5.1.0",
+    "cryptography==42.0.8",
+    "psycopg[binary]==3.2.3",
+]
+
+[tool.vercel]
+entrypoint = "backend.main:app"
